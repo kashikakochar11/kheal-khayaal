@@ -282,12 +282,10 @@
       <span class="font-body-md text-primary border-b-2 border-primary pb-1 cursor-pointer">Let's Heal</span>
     </div>
     <div class="flex items-center gap-md">
-      <button id="api-key-settings-btn"
-        class="flex items-center gap-xs px-sm py-xs bg-surface-container-high hover:bg-surface-container-highest rounded-full text-xs text-primary transition-all border border-primary/20"
-        title="API Key Status">
-        <span class="material-symbols-outlined text-sm">key</span>
-        <span id="api-key-status-text">.env Key</span>
-      </button>
+      <div class="flex items-center gap-xs px-sm py-xs bg-primary/10 border border-primary/30 rounded-full text-xs text-primary shadow-sm" title="Server API Connection Active">
+        <span class="material-symbols-outlined text-sm">verified_user</span>
+        <span>Secure Proxy</span>
+      </div>
       <button
         class="relative p-xs hover:bg-surface-container-high rounded-full transition-all cursor-pointer active:scale-95">
         <span class="material-symbols-outlined text-on-surface-variant text-3xl">notifications</span>
@@ -339,7 +337,7 @@
             <span class="material-symbols-outlined text-primary">library_books</span>
             <span class="font-label-sm text-label-sm">Resources</span>
           </div>
-          <div id="settings-trigger-link"
+          <div
             class="flex items-center gap-sm p-sm hover:bg-surface-container-high rounded-lg cursor-pointer transition-all">
             <span class="material-symbols-outlined text-primary">settings</span>
             <span class="font-label-sm text-label-sm">Settings</span>
@@ -448,45 +446,9 @@
     </main>
   </div>
 
-  <!-- API Key Configuration Modal (Fallback for runtime key entry) -->
-  <div id="key-modal"
-    class="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-50 hidden p-md">
-    <div class="glass-card max-w-md w-full p-lg rounded-xl shadow-2xl border border-primary/30 flex flex-col gap-md">
-      <div class="flex items-center gap-sm">
-        <span class="material-symbols-outlined text-primary text-3xl">vpn_key</span>
-        <h3 class="text-xl font-bold text-on-surface">Gemini API Key Setup</h3>
-      </div>
-      <p class="text-sm text-on-surface-variant leading-relaxed">
-        KHeal reads the Gemini API key directly from your project's <code
-          class="bg-surface-container-high px-1.5 py-0.5 rounded text-primary text-xs">.env</code> file.
-      </p>
-      <div class="bg-surface-container-high/60 p-sm rounded-lg border border-white/5 text-xs text-on-surface-variant">
-        <p class="font-semibold text-primary mb-1">To configure via .env:</p>
-        <code class="block text-secondary select-all">GEMINI_API_KEY=your_actual_key_here</code>
-      </div>
-      <div class="flex flex-col gap-xs">
-        <label class="text-xs text-on-surface-variant font-medium">Or enter/override API key for this browser
-          session:</label>
-        <input id="manual-api-key-input" type="password" placeholder="AIzaSy..."
-          class="w-full bg-surface-container-high border border-outline-variant rounded-lg px-sm py-xs text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none">
-      </div>
-      <div class="flex justify-end gap-sm mt-xs">
-        <button id="close-modal-btn"
-          class="px-md py-xs rounded-full text-xs text-on-surface-variant hover:bg-surface-container-high">Cancel</button>
-        <button id="save-key-btn"
-          class="px-md py-xs bg-primary text-on-primary font-semibold rounded-full text-xs hover:brightness-110 tactile-raised">Save
-          Key</button>
-      </div>
-    </div>
-  </div>
-
   <script>
     // Global State
-    let cachedApiKey = null;
     let isGenerating = false;
-
-    // System Instruction for KHeal
-    const SYSTEM_INSTRUCTION = `You are KHeal ( ख्याल ), an empathetic, professional, and highly knowledgeable AI medical assistant designed for health guidance, symptom triage, and wellness advice. Maintain a reassuring, supportive, and clinical tone. Always keep responses clear, well-structured (use bullet points or short sections when helpful), and concise.`;
 
     // Empty initial conversation history
     const conversationHistory = [];
@@ -496,14 +458,7 @@
     const sendBtn = document.getElementById('send-btn');
     const chatHistoryEl = document.getElementById('chat-history');
     const scrollContainer = document.getElementById('chat-scroll-container');
-    const keyModal = document.getElementById('key-modal');
-    const apiKeyStatusText = document.getElementById('api-key-status-text');
-    const apiKeySettingsBtn = document.getElementById('api-key-settings-btn');
-    const manualKeyInput = document.getElementById('manual-api-key-input');
-    const saveKeyBtn = document.getElementById('save-key-btn');
-    const closeModalBtn = document.getElementById('close-modal-btn');
     const newChatBtn = document.getElementById('new-chat-btn');
-    const settingsLink = document.getElementById('settings-trigger-link');
     const activeConsultationTitle = document.getElementById('active-consultation-title');
 
     // Input Bar Focus Micro-interactions
@@ -537,54 +492,6 @@
         doodle.style.transform = `translate(${x * factor}px, ${y * factor}px)`;
       });
     });
-
-    // Dynamic .env API Key Fetching (Strictly read from .env)
-    async function fetchApiKeyFromEnv() {
-      try {
-        const res = await fetch('.env?t=' + Date.now());
-        if (res.ok) {
-          const text = await res.text();
-          const match = text.match(/^GEMINI_API_KEY\s*=\s*["']?([^"'\r\n#]+)["']?/m);
-          if (match && match[1]) {
-            const extractedKey = match[1].trim();
-            if (extractedKey && extractedKey !== 'your_gemini_api_key_here') {
-              // If .env key is different from stored key, clear old stored session key
-              const storedKey = localStorage.getItem('GEMINI_API_KEY');
-              if (storedKey && storedKey !== extractedKey) {
-                localStorage.removeItem('GEMINI_API_KEY');
-              }
-              cachedApiKey = extractedKey;
-              updateKeyStatusUI(true, ".env Key Active");
-              return extractedKey;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("Unable to fetch .env directly via browser HTTP", e);
-      }
-
-      // Fallback: Check local storage override if user pasted key in modal
-      const localKey = localStorage.getItem('GEMINI_API_KEY');
-      if (localKey && localKey.trim()) {
-        cachedApiKey = localKey.trim();
-        updateKeyStatusUI(true, "Session Key Active");
-        return cachedApiKey;
-      }
-
-      updateKeyStatusUI(false, "Configure API Key");
-      return null;
-    }
-
-    function updateKeyStatusUI(isSet, label) {
-      if (apiKeyStatusText) apiKeyStatusText.textContent = label;
-      if (apiKeySettingsBtn) {
-        if (isSet) {
-          apiKeySettingsBtn.className = "flex items-center gap-xs px-sm py-xs bg-primary/10 border border-primary/40 rounded-full text-xs text-primary transition-all";
-        } else {
-          apiKeySettingsBtn.className = "flex items-center gap-xs px-sm py-xs bg-error/10 border border-error/40 rounded-full text-xs text-error transition-all";
-        }
-      }
-    }
 
     // Auto-scroll to bottom of chat container
     function scrollToBottom(smooth = true) {
@@ -708,14 +615,6 @@
       const text = (customText !== null ? customText : chatInput.value).trim();
       if (!text || isGenerating) return;
 
-      // Check API Key
-      let key = cachedApiKey || await fetchApiKeyFromEnv();
-      if (!key) {
-        keyModal.classList.remove('hidden');
-        manualKeyInput.focus();
-        return;
-      }
-
       // Clear input & set state
       if (customText === null) chatInput.value = '';
       isGenerating = true;
@@ -740,23 +639,18 @@
       showLoadingIndicator();
 
       try {
-        // 3. Directly call primary model gemini-3.6-flash (no fallback retry loop)
-        const model = 'gemini-3.6-flash';
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-        const res = await fetch(url, {
+        // 3. Call serverless endpoint /api/chat
+        const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            system_instruction: {
-              parts: [{ text: SYSTEM_INSTRUCTION }]
-            },
             contents: conversationHistory
           })
         });
 
         if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`API Error (${res.status}): ${errText}`);
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Server Error (${res.status})`);
         }
 
         const responseData = await res.json();
@@ -775,20 +669,10 @@
         appendBotMessage(botReplyText);
 
       } catch (err) {
-        console.error("Error communicating with Gemini API:", err);
+        console.error("Error communicating with assistant server:", err);
         removeLoadingIndicator();
 
-        // Clear stale session key if quota exceeded or key invalid
-        if (err.message && (err.message.includes('429') || err.message.includes('400') || err.message.includes('403'))) {
-          localStorage.removeItem('GEMINI_API_KEY');
-          cachedApiKey = null;
-          updateKeyStatusUI(false, "Quota Exceeded / Key Invalid");
-          setTimeout(() => {
-            if (keyModal) keyModal.classList.remove('hidden');
-          }, 800);
-        }
-
-        const errorMsg = `I apologize, I encountered an issue connecting to the Gemini API. Your API key has exceeded its quota or is invalid.\n\n*Please enter a fresh API key from [Google AI Studio](https://aistudio.google.com/app/apikey) in your \`.env\` file or in the popup configuration modal.*`;
+        const errorMsg = `I apologize, I encountered an issue connecting to the assistant server.\n\n*${escapeHtml(err.message || "Please try again shortly.")}*`;
         appendBotMessage(errorMsg);
       } finally {
         isGenerating = false;
@@ -817,34 +701,12 @@
       }
     });
 
-    // Modal event listeners
-    apiKeySettingsBtn.addEventListener('click', () => keyModal.classList.remove('hidden'));
-    if (settingsLink) settingsLink.addEventListener('click', () => keyModal.classList.remove('hidden'));
-    closeModalBtn.addEventListener('click', () => keyModal.classList.add('hidden'));
-
-    saveKeyBtn.addEventListener('click', () => {
-      const val = manualKeyInput.value.trim();
-      if (val) {
-        localStorage.setItem('GEMINI_API_KEY', val);
-        cachedApiKey = val;
-        updateKeyStatusUI(true, "Session Key Active");
-        keyModal.classList.add('hidden');
-        manualKeyInput.value = '';
-      }
-    });
-
     // New Chat Handler
     newChatBtn.addEventListener('click', () => {
       conversationHistory.length = 0; // Clear array
       chatHistoryEl.innerHTML = '';
       if (activeConsultationTitle) activeConsultationTitle.textContent = "New Health Consultation";
     });
-
-    // Initial setup on DOM ready
-    document.addEventListener('DOMContentLoaded', () => {
-      fetchApiKeyFromEnv();
-    });
-    fetchApiKeyFromEnv();
   </script>
 
 </body>
