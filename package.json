@@ -1,0 +1,12 @@
+{
+  "name": "kheal-khayaal",
+  "version": "1.0.0",
+  "description": "KHeal - Secure Medical Assistant",
+  "private": true,
+  "scripts": {
+    "dev": "python3 server.py"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^1.1.1"
+  }
+}
